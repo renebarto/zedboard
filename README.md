@@ -6,10 +6,47 @@ This documents explains how to build an operating system and how to create firmw
 We will use Vivado 2024.2 and PetaLinux 2024.2 for this.
 This folder contains a lot of material, however some is quite outdated, as the board was create in 2012/2014.
 
+We are going to ultimately use PetaLinux 2024.2, but for now will stick with 2021.2, as the [tutorial](https://spacewire.co.uk/tutorial/setup_vitis_vivado_petalinux/) by Spacewire is complete and working.
+
+## Try out board
+
+To make sure the board is fine, create SD card (>=1Gb), and place the original contents on this.
+
+1. Format the partion of the SD card as FAT32 (if there are more partitions, just the first one is important).
+
+2. Unzip the file `zedboard_oob_design.zip`, and copy the contents of the folder `ZedBoard_OOB_Design\sd_image` to the SD card.
+
+3. Eject the SD card correctly to make sure the contents are not corrupted.
+
+4. Connect the UART port to a PC using the mini USB to USB cable.
+5. Make sure the board is set to boot from SD:
+- JP2 is shortcut
+- JP3 is shortcut
+- JP7 (MI02) is in the low position
+- JP8 (MI03) is in the low position
+- JP9 (MI04) is in the high position
+- JP10 (MI05) is in the high position
+- JP11 (MI06) is in the low position
+
+6. Power on the board, and make sure the USB serial port is recognized. On Windows 11, it is quite tricky to find the right driver as the USB chip is quite old. On Linux, the USB port should be recognized. The driver that should be found for Windows 11 is shown below.
+7. Install a terminal application, and attach it to the serial device at 115200 N81.
+
+<img  src="images/cypress-driver.png" alt="Cypress-USB-to-serial-driver" width="400"/>
+
+8. Power off the board again.
+9. Place the SD card in the board.
+10. Open the terminal application.
+11. Power on the board and wait some time until the blue led lights up.
+12. After this you should see Linux boot on the console.
+13. Finally after booting you should see the display show the Digilent logo.
+
 ## Install Vivado
 
 Go to the [AMD / Xilinx site](https://www.xilinx.com/support/download.html), and log in (or create a new account).
 Select 2024.2, and download [Vivado™ Edition - 2024.2  Full Product Installation](https://www.xilinx.com/member/forms/download/xef.html?filename=FPGAs_AdaptiveSoCs_Unified_2024.2_1113_1001_Win64.exe) for Windows.
+
+:bangbang: **Important note:**
+Parts of Vitis / Vivado may not install correctly if the virus scanner is active. This may lead to confusing errors such as CMake not being able to configure. Consider temporarily switch off the virusscanner while installing.
 
 Follow the installation guide. If desired, you can also install DocNav and Vitis.
 
@@ -21,6 +58,9 @@ Go to the [AMD / Xilinx site](https://www.xilinx.com/support/download.html), and
 Select 2024.2, and download [PetaLinux Tools - Installer](https://www.xilinx.com/member/forms/download/xef.html?filename=petalinux-v2024.2-11062026-installer.run).
 
 You will either need a PC running Ubuntu 20.04 or 22.04, or you can use WSL 2 on Windows (10/11).
+
+:bangbang: **Important note:**
+The WSL build sometimes fails for unclear reasons. Often a rebuild fixes this. For a reproducible build, consider using a real Ubuntu installation, either on a physical machine or a VM.
 
 ### Using WSL
 
@@ -70,6 +110,12 @@ The first time it is run it will ask you for an account, which is automatically 
 
 ### Installation
 
+Make sure the following packages are installed:
+
+```
+sudo apt install tofrodos iproute2 gawk xvfb git make net-tools libncurses5-dev tftpd zlib1g-dev:i386 libssl-dev flex bison libselinux1 gnupg wget diffstat chrpath socat xterm autoconf libtool tar unzip texinfo zlib1g-dev gcc-multilib build-essential libsdl1.2-dev libglib2.0-dev screen pax gzip libtinfo5
+ ```
+
 Create a directory for PetaLinux files:
 ```
 mkdir petalinux
@@ -82,6 +128,8 @@ sudo chown <user>:<user> /opt/petalinux
 ```
 
 For '\<user>' fill in your username (twice). This will create a directory with write permissions for you.
+
+Copy `plnx-env-setup.sh` to the build system.
 
 Install required packages for PetaLinux:
 
@@ -153,7 +201,7 @@ In the green bar at the top, select `Run Block Automation`.
 
 Leave `Apply Board Preset` selected. This will configure the specifics for the selected board. Select `OK`.
 
-<img  src="images/Vivado-block-design-zynq-standard-ports.png" alt="Vivado block design Zynq after automation" width="500"/>
+<img  src="images/Vivado-block-design-zynq-standard-ports.png" alt="Vivado block design Zynq after automation" width="1000"/>
 
 Select the `Board` tab in the `Block Design` panel (top left).
 
@@ -235,11 +283,73 @@ Now look for the .xsa file. In the case shown, there will be a file `zedboard.xs
 
 Copy this file to the PetaLinux build environment.
 
+## Prepare PetaLinux build
+
+Go to the [AMD / Xilinx site](https://www.xilinx.com/support/download.html), and log in (or create a new account).
+Select 2024.2, and download
+
+[sstate_arm_2024.2_11061705.tar.gz](https://www.xilinx.com/member/forms/download/xef.html?filename=sstate_arm_2024.2_11061705.tar.gz)
+[downloads_2024.2_11061705.tar.gz](https://www.xilinx.com/member/forms/download/xef.html?filename=downloads_2024.2_11061705.tar.gz)
+
+And place the files in `/opt/xilinx/2024.2/downloads`. An easy way to do this is using WinSCP.
+
+Unpack the sstate cache:
+
+```bash
+rm -rf /opt/petalinux/2024.2/sstate-cache
+mkdir -p /opt/petalinux/2024.2/sstate-cache
+tar xzf /opt/xilinx/2024.2/downloads/sstate_arm_2024.2_11061705.tar.gz -C /opt/petalinux/2024.2/sstate-cache/
+```
+
+Unpack the download mirror:
+
+```bash
+rm -rf /opt/petalinux/2024.2/downloads
+mkdir -p /opt/petalinux/2024.2/downloads
+tar xzf /opt/xilinx/2024.2/downloads/downloads_2024.2_11061705.tar.gz -C /opt/petalinux/2024.2/
+```
+
+Install a TFTP server
+
+```bash
+sudo apt install tftpd-hpa tftp-hpa
+```
+
+Set up a TFTP server and directory
+
+```bash
+sudo mkdir /tftpboot
+sudo chown -R nobody:nogroup /tftpboot
+chmod -R 777 /tftpboot
+```
+
+Configure TFTP
+
+```bash
+sudo nano /etc/default/tftpd-hpa
+```
+
+Edit the contents:
+```text
+# /etc/default/tftpd-hpa
+
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="/tftpboot"
+TFTP_ADDRESS="0.0.0.0:69"
+TFTP_OPTIONS="--secure"
+```
+
+```bash
+sudo systemctl restart tftpd-hpa
+sudo systemctl enable tftpd-hpa
+```
+
 ## Create a PetaLinux project for zedboard
 
 Set up the PetaLinux environment (always needed when starting to work with PetaLinux after login):
 
 ```bash
+mkdir ~/petalinux
 cd ~/petalinux
 source /opt/petalinux/2024.2/settings.sh
 ```
@@ -251,12 +361,13 @@ Please refer to https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/2741928025
  for more details
 *************************************************************************************************************************************************
 PetaLinux environment set to '/opt/petalinux/2024.2'
+WARNING: /bin/sh is not bash! 
+bash is PetaLinux recommended shell. Please set your default shell to bash.
 [WARNING] This is not a supported OS
 [INFO] Checking free disk space
 [INFO] Checking installed tools
 [INFO] Checking installed development libraries
 [INFO] Checking network and other services
-[WARNING] No tftp server found - please refer to "UG1144 2024.2 PetaLinux Tools Documentation Reference Guide" for its impact and solution
 ```
 
 Create a project for zedboard:
@@ -269,6 +380,112 @@ petalinux-create project --template zynq --name zedboard
 [INFO] Create project: zedboard
 [INFO] New project successfully created in /home/rene/petalinux/zedboard
 ```
+
+Now add the hardware platform to the project:
+
+```bash
+cd zedboard
+petalinux-config --get-hw-description ../zedboard.xsa
+```
+
+```
+[INFO] Getting hardware description
+[INFO] Renaming zedboard.xsa to system.xsa
+[INFO] Extracting yocto SDK to components/yocto. This may take time!
+[INFO] Bitbake is not available, some functionality may be reduced.
+[INFO] Using HW file: /home/rene/petalinux/zedboard/project-spec/hw-description/system.xsa
+[INFO] Getting Platform info from HW file
+```
+
+The configuration menu will be shown. Change the following settings:
+
+- DTG Settings  --->
+  - MACHINE_NAME
+    - zedboard
+- FPGA Manager  --->
+  - Select Fpga Manager
+- Yocto Setting  --->
+- - Add pre-mirror url  --->
+    - file:///opt/petalinux/2024.2/downloads
+  - Local sstate feeds settings  --->
+    - file:///opt/petalinux/2024.2/sstate-cache/arm
+
+```
+[INFO] Generating Kconfig for project
+[INFO] Menuconfig project
+[INFO] Generating kconfig for rootfs
+[INFO] Silentconfig rootfs
+[INFO] Generating configuration files
+[INFO] Adding user layers
+[INFO] Generating machine conf file
+[INFO] Generating plnxtool conf file
+[INFO] Generating workspace directory
+NOTE: Starting bitbake server...
+NOTE: Started PRServer with DBfile: /home/rene/petalinux/zedboard/build/cache/prserv.sqlite3, Address: 127.0.0.1:42201, PID: 19703
+INFO: Specified workspace already set up, leaving as-is
+INFO: Enabling workspace layer in bblayers.conf
+[INFO] Successfully configured project
+```
+
+## Build the petalinux project
+
+Build the project:
+
+```bash
+petalinux-build
+```
+
+```
+[INFO] Building project
+[INFO] Bitbake is not available, some functionality may be reduced.
+[INFO] Using HW file: /home/rene/petalinux/zedboard/project-spec/hw-description/system.xsa
+[INFO] Getting Platform info from HW file
+[INFO] Silentconfig project
+[INFO] Silentconfig rootfs
+[INFO] Generating configuration files
+[INFO] Generating workspace directory
+NOTE: Starting bitbake server...
+NOTE: Started PRServer with DBfile: /home/rene/petalinux/zedboard/build/cache/prserv.sqlite3, Address: 127.0.0.1:42129, PID: 256989
+INFO: Specified workspace already set up, leaving as-is
+[INFO] bitbake petalinux-image-minimal
+NOTE: Started PRServer with DBfile: /home/rene/petalinux/zedboard/build/cache/prserv.sqlite3, Address: 127.0.0.1:40045, PID: 257056
+WARNING: XSCT has been deprecated. It will still be available for several releases. In the future, it's recommended to start new projects with SDT workflow.
+Loading cache: 100% |                                                                                                                                                                                                                                         | ETA:  --:--:--
+Loaded 0 entries from dependency cache.
+Parsing recipes: 100% |########################################################################################################################################################################################################################################| Time: 0:00:45
+Parsing of 5800 .bb files complete (0 cached, 5800 parsed). 8454 targets, 1106 skipped, 27 masked, 0 errors.
+NOTE: Resolving any missing task queue dependencies
+Checking sstate mirror object availability: 100% |#############################################################################################################################################################################################################| Time: 0:00:06
+Sstate summary: Wanted 536 Local 10 Mirrors 467 Missed 59 Current 2177 (88% match, 97% complete)
+Removing 52 stale sstate objects for arch zynq_generic_7z020: 100% |###########################################################################################################################################################################################| Time: 0:00:00
+NOTE: Executing Tasks
+NOTE: Tasks Summary: Attempted 5988 tasks of which 5852 didn't need to be rerun and all succeeded.
+
+Summary: There was 1 WARNING message.
+[INFO] Successfully copied built images to tftp dir: /tftpboot
+[INFO] Successfully built project
+```
+
+Build the SDK:
+
+```bash
+petalinux-build --sdk
+```
+
+```
+```
+
+## Booting
+
+```
+setenv dtb_addr 0x01000000
+setenv kernel_addr 0x02000000
+setenv serverip 192.168.1.245
+tftpboot ${dtb_addr} ${serverip}:system.dtb
+tftpboot ${kernel_addr} ${serverip}:image.ub
+bootm ${kernel_addr} - ${dtb_addr}
+```
+
 
     2  petalinux-package boot --u-boot
     3  cd
