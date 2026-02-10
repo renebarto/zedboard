@@ -1804,6 +1804,8 @@ You can see that the NTP server is not yet configured.
 
 ### SD boot
 
+#### Create partitions
+
 Insert an SD card and find out which device it is in (normally /dev/sdb).
 If there is already a partition on the SD card, you can e.g. use mount:
 
@@ -1880,6 +1882,8 @@ E.g.:
 user@machine:~$ sudo umount /dev/sdb1
 ```
 
+#### Create file systems
+
 Create file systems on the SD card.
 
 ```bash
@@ -1898,11 +1902,51 @@ Creating journal (16384 blocks): done
 Writing superblocks and filesystem accounting information: done
 ```
 
+#### Create partitions
+
+Look for partitions:
+
+```bash
+ls /media/$(id -un)
+```
+
+You should at least see two partitions, one with a short name (xxxx-xxxx) and one with a GUID name (xxxxxxxx-xxx-xxx-xxx-xxxxxxxxxxxx).
+The boot partition is the short name, the GUID is the Linux partition
+
+```text
+2A3D-259F   caf0f358-b46f-4524-801b-f7a0e763c6ad
+```
+
+Copy files to the boot partition:
+
+```bash
+sudo rm -rf /media/$(id -un)/2A3D-259F/*
+sudo cp ~/xilinx/zedboard/os/petalinux/build/tmp/deploy/images/zynq-generic-7z020/boot.bin /media/$(id -un)/2A3D-259F/
+sudo cp /tftpboot/boot.scr /media/$(id -un)/2A3D-259F/
+sudo cp /tftpboot/image.ub /media/$(id -un)/2A3D-259F/
+sudo cp /tftpboot/system.dtb /media/$(id -un)/2A3D-259F/
+```
+
+Extract root file system to the Linux partition:
+
+```bash
+sudo rm -rf /media/$(id -un)/caf0f358-b46f-4524-801b-f7a0e763c6ad/*
+sudo tar xzf /tftpboot/rootfs.tar.gz -C /media/$(id -un)/caf0f358-b46f-4524-801b-f7a0e763c6ad/
+```
+
+#### Boot from SD
+
 Synchronize the SD contents.
 
 ```bash
 user@machine:~$ sync
 ```
+
+Eject the SD card in Ubuntu:
+
+Right click on one of the SD partitions, and select **Unmount**.
+
+<img  src="images/Ubuntu-eject-SD.png" alt="Jumper settings for SD mode" width="200"/>
 
 You can now take out the SD card and place it in the board.
 
